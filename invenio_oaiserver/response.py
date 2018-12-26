@@ -11,9 +11,9 @@
 from datetime import MINYEAR, datetime, timedelta
 
 from flask import current_app, url_for
-from invenio_db import db
-from invenio_records.api import Record
-from invenio_records.models import RecordMetadata
+# from invenio_db import db
+# from invenio_records.api import Record
+# from invenio_records.models import RecordMetadata
 from lxml import etree
 from lxml.etree import Element, ElementTree, SubElement
 
@@ -22,7 +22,10 @@ from .models import OAISet
 from .provider import OAIIDProvider
 from .query import get_records
 from .resumption_token import serialize
-from .utils import datetime_to_datestamp, sanitize_unicode, serializer
+from .utils import datetime_to_datestamp, serializer
+
+from .api import OaiIdentify
+from weko_deposit.api import WekoRecord
 
 NS_OAIPMH = 'http://www.openarchives.org/OAI/2.0/'
 NS_OAIPMH_XSD = 'http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd'
@@ -74,9 +77,9 @@ def envelope(**kwargs):
     return e_tree, e_oaipmh
 
 
-def error(errors):
+def error(errors, **kwargs):
     """Create error element."""
-    e_tree, e_oaipmh = envelope()
+    e_tree, e_oaipmh = envelope(**kwargs)
     for code, message in errors:
         e_error = SubElement(e_oaipmh, etree.QName(NS_OAIPMH, 'error'))
         e_error.set('code', code)
@@ -95,18 +98,33 @@ def identify(**kwargs):
     """Create OAI-PMH response for verb Identify."""
     cfg = current_app.config
 
+    # add by Mr ryuu. at 2018/06/06 start
+    # Get The Set Of Identify
+    oaiObj = OaiIdentify.get_all()
+    # add by Mr ryuu. at 2018/06/06 end
+
     e_tree, e_identify = verb(**kwargs)
 
     e_repositoryName = SubElement(
         e_identify, etree.QName(NS_OAIPMH, 'repositoryName'))
+
+    # add by Mr ryuu. at 2018/06/06 start
+    cfg['OAISERVER_REPOSITORY_NAME'] = oaiObj.repositoryName
+    # add by Mr ryuu. at 2018/06/06 end
+
     e_repositoryName.text = cfg['OAISERVER_REPOSITORY_NAME']
 
     e_baseURL = SubElement(e_identify, etree.QName(NS_OAIPMH, 'baseURL'))
+
     e_baseURL.text = url_for('invenio_oaiserver.response', _external=True)
 
     e_protocolVersion = SubElement(e_identify,
                                    etree.QName(NS_OAIPMH, 'protocolVersion'))
     e_protocolVersion.text = cfg['OAISERVER_PROTOCOL_VERSION']
+
+    # add by Mr ryuu. at 2018/06/06 start
+    cfg['OAISERVER_ADMIN_EMAILS'][0] = oaiObj.emails
+    # add by Mr ryuu. at 2018/06/06 end
 
     for adminEmail in cfg['OAISERVER_ADMIN_EMAILS']:
         e = SubElement(e_identify, etree.QName(NS_OAIPMH, 'adminEmail'))
@@ -115,10 +133,14 @@ def identify(**kwargs):
     e_earliestDatestamp = SubElement(
         e_identify, etree.QName(
             NS_OAIPMH, 'earliestDatestamp'))
-    e_earliestDatestamp.text = datetime_to_datestamp(
-        db.session.query(db.func.min(RecordMetadata.created)).scalar() or
-        datetime(MINYEAR, 1, 1)
-    )
+
+    # update by Mr ryuu. at 2018/06/06 start
+    # e_earliestDatestamp.text = datetime_to_datestamp(
+    #     db.session.query(db.func.min(RecordMetadata.created)).scalar() or
+    #     datetime(MINYEAR, 1, 1)
+    # )
+    e_earliestDatestamp.text = datetime_to_datestamp(oaiObj.earliestDatastamp)
+    # update by Mr ryuu. at 2018/06/06 end
 
     e_deletedRecord = SubElement(e_identify,
                                  etree.QName(NS_OAIPMH, 'deletedRecord'))
@@ -184,7 +206,7 @@ def listsets(**kwargs):
         e_setSpec = SubElement(e_set, etree.QName(NS_OAIPMH, 'setSpec'))
         e_setSpec.text = oai_set.spec
         e_setName = SubElement(e_set, etree.QName(NS_OAIPMH, 'setName'))
-        e_setName.text = sanitize_unicode(oai_set.name)
+        e_setName.text = oai_set.name
         if oai_set.description:
             e_setDescription = SubElement(e_set, etree.QName(NS_OAIPMH,
                                                              'setDescription'))
@@ -246,9 +268,19 @@ def header(parent, identifier, datestamp, sets=None, deleted=False):
 
 def getrecord(**kwargs):
     """Create OAI-PMH response for verb Identify."""
+
+    def get_error_code_msg():
+        code = "noRecordsMatch"
+        msg = "The combination of the values of the from, until, " \
+              "set and metadataPrefix arguments results in an empty list."
+        return [(code, msg)]
+
     record_dumper = serializer(kwargs['metadataPrefix'])
     pid = OAIIDProvider.get(pid_value=kwargs['identifier']).pid
-    record = Record.get_record(pid.object_uuid)
+    # record = Record.get_record(pid.object_uuid)
+    harvest_public_state, record = WekoRecord.get_record_with_hps(pid.object_uuid)
+    if not harvest_public_state:
+        return error(get_error_code_msg(), **kwargs)
 
     e_tree, e_getrecord = verb(**kwargs)
     e_record = SubElement(e_getrecord, etree.QName(NS_OAIPMH, 'record'))

@@ -10,7 +10,6 @@
 
 from __future__ import absolute_import, print_function
 
-import re
 from functools import partial
 
 from flask import current_app
@@ -23,7 +22,6 @@ try:
     from functools import lru_cache
 except ImportError:  # pragma: no cover
     from functools32 import lru_cache
-
 
 ns = {
     None: 'http://datacite.org/schema/kernel-4',
@@ -169,13 +167,3 @@ def friends_description(baseURLs):
     for baseURL in baseURLs:
         friends.append(E('baseURL', baseURL))
     return etree.tostring(friends, pretty_print=True)
-
-
-def sanitize_unicode(value):
-    """Removes characters incompatible with XML1.0.
-
-    Following W3C recommandation : https://www.w3.org/TR/REC-xml/#charsets
-    Based on https://lsimons.wordpress.com/2011/03/17/stripping-illegal-characters-out-of-xml-in-python/ # noqa
-    """
-    return re.sub(u'[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]',
-                  '', value)

@@ -19,6 +19,7 @@ from sqlalchemy_utils import Timestamp
 from .errors import OAISetSpecUpdateError
 from .proxies import current_oaiserver
 from .utils import datetime_to_datestamp
+import sqlalchemy as sa
 
 
 class OAISet(db.Model, Timestamp):
@@ -125,3 +126,59 @@ listen(OAISet, 'after_delete', oaiset_removed_or_inserted)
 listen(OAISet.search_pattern, 'set', oaiset_attribute_changed)
 
 __all__ = ('OAISet', )
+
+# OAI-PMH
+
+class Identify(db.Model, Timestamp):
+    """Information about OAI set."""
+
+    __tablename__ = 'oaiserver_identify'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    outPutSetting = db.Column(
+        db.Boolean,
+        nullable=False,
+        unique=True,
+        info=dict(
+            label=_('OutPut Setting'),
+            description=_('output setting of OAI-PMH'),
+        ),
+    )
+    """Set output of OAI-PMH."""
+
+    emails = db.Column(
+        db.String(255),
+        info=dict(
+            label=_('Emails'),
+            description=_('Emails of OAI-PMH.'),
+        ),
+        index=True,
+    )
+    """Set Emails of OAI-PMH."""
+
+    repositoryName = db.Column(
+        db.String(255),
+        nullable=True,
+        info=dict(
+            label=_('Repository Name'),
+            description=_('Repository Name of OAI-PMH'),
+        ),
+    )
+    """Set Repository Name of OAI-PMH."""
+
+    earliestDatastamp = db.Column(
+        sa.DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        info=dict(
+            label=_('Earliest Data'),
+            description=_('The earliest data of OAI-PMH'),
+        )
+    )
+
+    """The earliest data of OAI-PMH."""
+
+
+
+__all__ = ('Identify', )

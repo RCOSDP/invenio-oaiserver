@@ -82,8 +82,8 @@ install_requires = [
     'Flask>=0.11.1',
     'Flask-BabelEx>=0.9.2',
     'dojson>=1.2.0',
-    'invenio-pidstore>=1.0.0',
-    'invenio-records>=1.0.0',
+    'invenio-pidstore>=1.0.0b2',
+    'invenio-records>=1.0.0b3',
     'lxml>=3.5.0',
     'marshmallow>=2.7.0',
     'webargs>=1.3.2',
@@ -129,6 +129,7 @@ setup(
         ],
         'invenio_admin.views': [
             'invenio_oaiserver = invenio_oaiserver.admin:set_adminview',
+            'invenio_oaiserver_aa = invenio_oaiserver.admin:set_OAIPMHview'
         ],
         'invenio_jsonschemas.schemas': [
             'oaiserver = invenio_oaiserver.schemas',
